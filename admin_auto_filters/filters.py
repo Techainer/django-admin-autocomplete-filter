@@ -7,6 +7,7 @@ from django.db.models.fields.related_descriptors import ReverseManyToOneDescript
 from django.forms.widgets import Media, MEDIA_TYPES, media_property
 from django.shortcuts import reverse
 from django import VERSION as DJANGO_VERSION
+from django.db.models.query_utils import DeferredAttribute
 
 class AutocompleteSelect(Base):
     def __init__(self, rel, admin_site, attrs=None, choices=(), using=None, custom_url=None):
@@ -72,6 +73,7 @@ class AutocompleteFilter(admin.SimpleListFilter):
         if self.is_placeholder_title:
             # Upper case letter P as dirty hack for bypass django2 widget force placeholder value as empty string ("")
             attrs['data-Placeholder'] = self.title
+
         self.rendered_widget = field.widget.render(
             name=self.parameter_name,
             value=self.used_parameters.get(self.parameter_name, ''),
@@ -92,10 +94,15 @@ class AutocompleteFilter(admin.SimpleListFilter):
             # includes ManyToOneRel, ManyToManyRel
             # also includes OneToOneRel - not sure how this would be used
             related_model = field_desc.related_model
+        elif isinstance(field_desc, DeferredAttribute): 
+            related_model = model
+        elif field_desc.__class__.__name__ == "DescriptorWrapper":
+            return field_desc.descriptor.get_queryset() 
         else:
             # primarily for ForeignKey/ForeignKeyDeferredAttribute
             # also includes ForwardManyToOneDescriptor, ForwardOneToOneDescriptor, ReverseOneToOneDescriptor
             return field_desc.get_queryset()
+
         return related_model.objects.get_queryset()
 
     def get_form_field(self):
